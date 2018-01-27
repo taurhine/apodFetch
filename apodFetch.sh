@@ -1,12 +1,22 @@
+
 #!/bin/bash
+#https://github.com/taurhine/apodFetch
 
 #check if there is already a cache file from today
 hashNameExt=".apodcache"
 wpPath="/home/""$(whoami)""/Documents/wallpapers/apod"
 cachePath="/home/""$(whoami)"
+
+#check if the cache path exist
+if [ ! -d $cachePath ]; then
+    echo "Cache path ""\"$cachePath\""" doesn't exist!"
+    exit 1
+fi
+
+#get the name of the cache file from today
 todaysCache="$(find $cachePath/*$hashNameExt -mtime 0 | grep $hashNameExt)"
 
-#if there is no cache from today then fetch the page
+#if there is no cache file from today then fetch the page
 if [ ! "$todaysCache" ]; then
 
     #fetch the webpage
@@ -19,13 +29,19 @@ if [ ! "$todaysCache" ]; then
     if [ ! -f ./$hashName ]; then
         linkPrefix="https://apod.nasa.gov/apod/"
 
-        # create the destination path if it doesn't exist
+        #create the destination path if it doesn't exist
         if [ ! -d $wpPath ]; then
             mkdir -p $wpPath
         fi
 
+        #abort execution if the walpaper path was not made
+        if [ ! -d $wpPath ]; then
+            echo "Could not create ""\"$wpPath\""
+            exit 1
+        fi
+
         #remove the old cache files
-        find *.cache -mtime +1 -exec rm {} \;
+        find *$hashNameExt -mtime +1 -exec rm {} \;
 
         #rename the file to the hash
         mv $cachePath/cached.html $cachePath/$hashName
@@ -33,13 +49,14 @@ if [ ! "$todaysCache" ]; then
         #compile the full link string
         fullLink=$linkPrefix$(cat $cachePath/$hashName | grep '^<a href.*\.[jpegJPEG]*\">$' | awk -F '"' '{print $2}')
 
-        #download the picture
+        #prepare the filename string
         fileName=`date +"%Y%m%d"`".jpg"
-        wget -q $fullLink -O $cachePath/$fileName
 
-        #copy the file to its destination
-        cp $cachePath/$fileName $wpPath/
-        mv $cachePath/$fileName $wpPath"/apod.jpg"
+        #download the picture
+        wget -q $fullLink -O $wpPath/$fileName
+
+        #save the file as the current wallpaper
+        cp $wpPath/$fileName $wpPath"/apod.jpg"
 
         #convert the jpg to png to use it as i3lock background
         convert $wpPath"/apod.jpg" $wpPath"/apod.png"
