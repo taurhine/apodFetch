@@ -1,5 +1,5 @@
-
 #!/bin/bash
+
 #https://github.com/taurhine/apodFetch
 
 #check if there is already a cache file from today
@@ -58,8 +58,11 @@ if [ ! "$todaysCache" ]; then
         #save the file as the current wallpaper
         cp $wpPath/$fileName $wpPath"/apod.jpg"
 
-        #convert the jpg to png to use it as i3lock background
-        convert $wpPath"/apod.jpg" $wpPath"/apod.png"
+        #get the current screen resolution
+        screenRes="$(xrandr --current | grep 'primary' | awk -F ' ' '{print $4}' | awk -F '+' '{print $1}')"
+
+        #convert and scale the jpg to png in current resolution to use it as i3lock background
+        convert -scale $screenRes $wpPath"/apod.jpg" $wpPath"/apod.png"
 
         #update the background picture
         feh --no-fehbg --bg-fill $wpPath"/apod.jpg"
