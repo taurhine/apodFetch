@@ -10,4 +10,4 @@ For the i3wm minimalists... A bash script to change your wallpaper daily to the 
 
 * add the following line if you want to use the same wallpaper for the i3lock, in my case I've bound l for the lock screen
   
-  bindsym l exec --no-startup-id "i3lock -i ~/Documents/wallpapers/apod/apod.png", mode "default"
+  bindsym l exec --no-startup-id "i3lock -c 000000 -i ~/Documents/wallpapers/apod/apod.png", mode "default"
