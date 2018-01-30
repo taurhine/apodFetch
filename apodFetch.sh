@@ -46,8 +46,15 @@ if [ ! "$todaysCache" ]; then
         #rename the file to the hash
         mv $cachePath/cached.html $cachePath/$hashName
 
+        relativePicPath="$(cat $cachePath/$hashName | grep '^<a href.*\.[jpegJPEG]*\">$' | awk -F '"' '{print $2}')"
+
+        if [ ! $relativePicPath ]; then
+            echo "No picture found!"
+            exit 1
+        fi
+
         #compile the full link string
-        fullLink=$linkPrefix$(cat $cachePath/$hashName | grep '^<a href.*\.[jpegJPEG]*\">$' | awk -F '"' '{print $2}')
+        fullLink=$linkPrefix$relativePicPath
 
         #prepare the filename string
         fileName=`date +"%Y%m%d"`".jpg"
