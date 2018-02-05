@@ -3,14 +3,16 @@
 #https://github.com/taurhine/apodFetch
 
 #static options
+defaultScaleMode="fill"
 #effect to be applied to i3lock background
 #effectOpt=""
-effectOpt="-noise 10"
+effectOpt="-paint 2 -noise 10"
 #effectOpt="-paint 2"
 
 hashNameExt=".apodcache"
 wpPath="/home/""$(whoami)""/Documents/wallpapers/apod"
 cachePath="/home/""$(whoami)"
+linkPrefix="https://apod.nasa.gov/apod"
 
 EnsurePathExists()
 {
@@ -26,149 +28,119 @@ EnsurePathExists()
     fi
 }
 
-ScaleAndSetWallpaper()
+GetParameters()
 {
-    fileName=$wpPath/$1
+    #initialise the scaleMode with the default setting
+    scaleMode=$defaultScaleMode
 
-    #make sure that the file exists
-    if [ ! -f $fileName ]; then
-        echo "File not found:""$fileName"
-        exit 1;
-    fi
-
-    #get the current screen resolution
-    screenRes="$(xrandr --current | grep 'primary' | awk -F ' ' '{print $4}' | awk -F '+' '{print $1}')"
-
-    if test "$2" = "center"; then
-        resizeOpt=""
-    elif test "$2" = "fill"; then
-        #decide whether to fit height or width
-        screenW="$(echo $screenRes | awk -F 'x' '{print $1}')"
-        screenH="$(echo $screenRes | awk -F 'x' '{print $2}')"
-        picW="$(identify -format '%w' $fileName)"
-        picH="$(identify -format '%h' $fileName)"
-
-        if [ $picH -gt $screenH ]; then
-            if [ $picW -lt $screenW ]; then
-                fitDimension=$screenW
+    #check the parameters to define the target date
+    case "$1" in
+        "")
+            #by default the target date will be set to today
+            targetDate=`date +"%y%m%d"`
+        ;;
+        "-c")
+            #this option accepts numbers >= 0
+            if [[ $2 =~ ^[0-9]+$ ]]; then
+                targetDate=`date --date "-$2 day" +"%y%m%d"`
+            elif test "$2" = "today"; then
+                targetDate=`date +"%y%m%d"`
             else
-                #both dimensions are bigger than the screen
-                if [ $picW -lt $picH ]; then
-                    fitDimension=$screenW
-                else
-                    fitDimension="x"$screenH
-                fi
+                echo "invalid parameter for option -c ""$2"
+                exit 1
             fi
-        else
-            if [ $picW -gt $screenW ]; then
-                fitDimension="x"$screenH
-            else
-                #both dimensions are smaller than the screen
-                if [ $picW -gt $picH ]; then
-                    fitDimension=$screenW
-                else
-                    fitDimension="x"$screenH
-                fi
-            fi
-        fi
-        resizeOpt="-resize "$fitDimension
-    else
-        resizeOpt="-resize $screenRes"
-    fi
 
-    #scale and resize the picture for the current resolution
-    convert  -background black $resizeOpt -extent $screenRes -gravity center $fileName $wpPath"/apod.png"
-
-    if test "$effectOpt" = ""; then
-        #no effect selected, copy the same file
-        cp $wpPath"/apod.png" $wpPath"/apod_lock.png"
-    else
-        convert $effectOpt $wpPath"/apod.png" $wpPath"/apod_lock.png"
-    fi
-
-    #update the wallpaper
-    feh --no-fehbg --bg-tile $wpPath"/apod.png"
+            case "$3" in
+                "")
+                    scaleMode=$defaultScaleMode
+                    ;;
+                "fill" | "fitall" | "center")
+                    scaleMode=$3
+                    ;;
+                *)
+                    echo "unknown option ""$3"
+                    exit 1
+                    ;;
+            esac
+            ;;
+            *)
+                echo "unknown option ""$1"
+                exit 1
+                ;;
+    esac
 }
 
-#ensure cace path exists, try to create if it doesn't
-EnsurePathExists $cachePath
+DownloadPicture()
+{
+    fileName=$targetDate".jpg"
 
-#ensure that the destination path exists, try to create if it doesn't
-EnsurePathExists $wpPath
+    #check if we already have a picture from that date
+    fileFullPath=$wpPath/$fileName
 
-if test "$1" = ""; then
-    echo "normal mode"
-elif test "$1" = "-f"; then
-    echo "forced update"
-    rm $cachePath/*$hashNameExt
-elif test "$1" = "-c"; then
-    #this option accepts numbers >= 0
-    if [[ $2 =~ ^[0-9]+$ ]]; then
-        fileName=`date --date "-$2 day" +"%Y%m%d"`".jpg"
-    elif test "$2" = "today"; then
-        fileName=`date +"%Y%m%d"`".jpg"
-    else
-        echo "invalid parameter for option -c ""$2"
-        exit 1
-    fi
+    #if the file does not exist try to download it
+    if [ ! -f $fileFullPath ]; then
+        #fetch the webpage
+        wget $linkPrefix/"ap"$targetDate".html" -q -O $cachePath/cached.html
 
-    if test "$3" = "fill"; then
-        #set the wallpaper without resizing
-        ScaleAndSetWallpaper $fileName $3
-    elif test "$3" = "center"; then
-        ScaleAndSetWallpaper $fileName $3
-    elif test "$3" = ""; then
-        #set the wallpaper
-        ScaleAndSetWallpaper $fileName
-    else
-        echo "unknown option ""$3"
-        exit 1
-    fi
-
-else
-    echo "unknown option ""$1"
-    exit 1
-fi
-
-#get the name of the cache file from today
-todaysCache="$(find $cachePath/*$hashNameExt -mtime 0 | grep $hashNameExt)"
-
-#if there is no cache file from today then fetch the page
-if [ ! "$todaysCache" ]; then
-
-    #fetch the webpage
-    wget https://apod.nasa.gov/apod/astropix.html -q -O $cachePath/cached.html
-
-    #get the sha1 hash of the file
-    hashName="$(sha1sum $cachePath/cached.html | awk '{print $1}')""$hashNameExt"
-
-    #check if a file with the same name exists
-    if [ ! -f ./$hashName ]; then
-        linkPrefix="https://apod.nasa.gov/apod"
-
-        #remove the old cache files
-        find $cachePath/*$hashNameExt -mtime +1 -exec rm {} \;
-
-        #rename the file to the hash
-        mv $cachePath/cached.html $cachePath/$hashName
-
-        relativePicPath="$(cat $cachePath/$hashName | grep '^<a href.*\.[jpegJPEG]*\">$' | awk -F '"' '{print $2}')"
+        relativePicPath="$(cat $cachePath/cached.html | grep '^<IMG SRC=.*\.[jpegJPEG]*\"$' | awk -F '"' '{print $2}')"
 
         if [ ! $relativePicPath ]; then
-            echo "No picture found!"
+            echo "No picture found for $targetDate"
             exit 1
         fi
 
         #compile the full link string
         fullLink=$linkPrefix/$relativePicPath
 
-        #prepare the filename string
-        fileName=`date +"%Y%m%d"`".jpg"
-
         #download the picture
-        wget -q $fullLink -O $wpPath/$fileName
-
-        #set the wallpaper
-        ScaleAndSetWallpaper $fileName
+        wget -q $fullLink -O $fileFullPath
     fi
-fi
+}
+
+ScaleAndSetWallpaper()
+{
+    #make sure that the file exists
+    if [ ! -f $fileFullPath ]; then
+        echo "File not found:""$fileFullPath"
+        exit 1;
+    fi
+
+    #get the current screen resolution
+    screenRes="$(xrandr --current | grep 'primary' | awk -F ' ' '{print $4}' | awk -F '+' '{print $1}')"
+
+    case $scaleMode in
+        "center")
+            resizeOpt=""
+            ;;
+        "fill")
+            screenW="$(echo $screenRes | awk -F 'x' '{print $1}')"
+            resizeOpt="-resize $screenW"
+            ;;
+        *)
+            resizeOpt="-resize $screenRes"
+            ;;
+    esac
+
+    #scale and resize the picture for the current resolution
+    convert -background black $resizeOpt -extent $screenRes -gravity center -quiet $fileFullPath $wpPath"/apod.png"
+
+    if test "$effectOpt" = ""; then
+        #no effect selected, copy the same file
+        cp $wpPath"/apod.png" $wpPath"/apod_lock.png"
+    else
+        convert $effectOpt $wpPath"/apod.png" -quiet $wpPath"/apod_lock.png"
+    fi
+
+    #set the wallpaper
+    feh --no-fehbg --bg-tile $wpPath"/apod.png"
+}
+
+EnsurePathExists $cachePath
+
+EnsurePathExists $wpPath
+
+GetParameters "$1" "$2" "$3"
+
+DownloadPicture
+
+ScaleAndSetWallpaper
