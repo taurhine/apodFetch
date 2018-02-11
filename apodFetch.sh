@@ -41,6 +41,7 @@ ShowMessage()
 CheckDependencies()
 {
     echo "notify-send
+          feh
           wget
           awk
           sed
