@@ -38,6 +38,37 @@ ShowMessage()
     fi
 }
 
+CheckDependencies()
+{
+    echo "notify-send
+          wget
+          awk
+          sed
+          convert
+          rdjpgcom
+          html2text" | while read commandDep
+    do
+        if test "$(command -v $commandDep)" = ""; then
+            case "$commandDep" in
+                "notify-send")
+                    messagesAsNotification="disabled"
+                    ShowMessage "apodFetch: error" "package libnotify is missing"
+                    ;;
+                "convert")
+                    ShowMessage "apodFetch: error" "package imagemagick is missing"
+                    ;;
+                "rdjpgcom")
+                    ShowMessage "apodFetch: error" "package libjpeg-progs is missing"
+                    ;;
+                *)
+                    ShowMessage "apodFetch: error" "package $commandDep is missing"
+                    ;;
+            esac
+        fi
+    done
+    exit 1
+}
+
 EnsurePathExists()
 {
     #create the destination path if it doesn't exist
@@ -62,6 +93,9 @@ GetParameters()
         "")
             #by default the target date will be set to today
             targetDate=`date +"%y%m%d"`
+            ;;
+        "-d")
+            CheckDependencies
             ;;
         "-r")
             randomDay="$(( ( RANDOM % 365 )  + 1 ))"
