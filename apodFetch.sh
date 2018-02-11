@@ -2,17 +2,41 @@
 
 #https://github.com/taurhine/apodFetch
 
-#static options
+##################
+# static options #
+######################################################
+
+#default scale mode
 defaultScaleMode="fill"
-#effect to be applied to i3lock background
-#effectOpt=""
+
+#effect to be applied to lock-screen  background
+# effectOpt=""
 effectOpt="-paint 2 -noise 10"
-#effectOpt="-paint 2"
+
+#show description as notification on wallpaper change
+descAsNotification="enabled"
+
+#show apodFetch messages as notification
+messagesAsNotification="enabled"
+
+#show description in lock-screen
+lockscreenDesc="disabled"
+
+######################################################
 
 hashNameExt=".apodcache"
 wpPath="/home/""$(whoami)""/Documents/wallpapers/apod"
 cachePath="/home/""$(whoami)"
 linkPrefix="https://apod.nasa.gov/apod"
+
+ShowMessage()
+{
+    if test "$messagesAsNotification" = "enabled"; then
+        notify-send "$1" "$2"
+    else
+        echo "$1" "$2"
+    fi
+}
 
 EnsurePathExists()
 {
@@ -23,7 +47,7 @@ EnsurePathExists()
 
     #abort execution if the path was not made
     if [ ! -d $1 ]; then
-        echo "Could not create ""\"$1\""
+        ShowMessage "apodFetch: error" "Could not create ""\"$1\""
         exit 1
     fi
 }
@@ -38,7 +62,11 @@ GetParameters()
         "")
             #by default the target date will be set to today
             targetDate=`date +"%y%m%d"`
-        ;;
+            ;;
+        "-r")
+            randomDay="$(( ( RANDOM % 365 )  + 1 ))"
+            targetDate=`date --date "-$randomDay day" +"%y%m%d"`
+            ;;
         "-c")
             #this option accepts numbers >= 0
             if [[ $2 =~ ^[0-9]+$ ]]; then
@@ -46,7 +74,7 @@ GetParameters()
             elif test "$2" = "today"; then
                 targetDate=`date +"%y%m%d"`
             else
-                echo "invalid parameter for option -c ""$2"
+                ShowMessage "apodFetch: error" "invalid parameter for option -c ""$2"
                 exit 1
             fi
 
@@ -58,16 +86,29 @@ GetParameters()
                     scaleMode=$3
                     ;;
                 *)
-                    echo "unknown option ""$3"
+                    ShowMessage "apodFetch: error" "unknown option ""$3"
                     exit 1
                     ;;
             esac
             ;;
             *)
-                echo "unknown option ""$1"
+                ShowMessage "apodFetch: error" "unknown option ""$1"
                 exit 1
                 ;;
     esac
+}
+
+GetDescription()
+{
+    #read the description from the jpg file and escape the '
+    description=$(rdjpgcom $fileFullPath | sed "s/'/\\\'/g")
+}
+
+ShowDescriptionAsNotification()
+{
+    if test "$descAsNotification" = "enabled"; then
+        notify-send -u critical "NASA Astronomy Picture for $targetDate" "$description"
+    fi
 }
 
 DownloadPicture()
@@ -82,18 +123,24 @@ DownloadPicture()
         #fetch the webpage
         wget $linkPrefix/"ap"$targetDate".html" -q -O $cachePath/cached.html
 
+        title="$(grep "<title>" $cachePath/cached.html | awk -F ' - ' '{print $2}')"
+
+        description="$(sed -n '/Explanation:/,/Tomorrow/p' $cachePath/cached.html | html2text | sed 's/_/ /g' | sed 's/Explanation: //g' | sed '$d')"
+
         relativePicPath="$(cat $cachePath/cached.html | grep '^<IMG SRC=.*\.[jpegJPEG]*\"$' | awk -F '"' '{print $2}')"
 
         if [ ! $relativePicPath ]; then
-            echo "No picture found for $targetDate"
+            ShowMessage "apodFetch: info" "No picture found for the date $targetDate"
             exit 1
         fi
 
         #compile the full link string
         fullLink=$linkPrefix/$relativePicPath
 
-        #download the picture
-        wget -q $fullLink -O $fileFullPath
+        #download the picture and add description
+        wget -qO - $fullLink | wrjpgcom -replace -c "$title
+
+$description" > $fileFullPath
     fi
 }
 
@@ -101,7 +148,7 @@ ScaleAndSetWallpaper()
 {
     #make sure that the file exists
     if [ ! -f $fileFullPath ]; then
-        echo "File not found:""$fileFullPath"
+        ShowMessage "apodFetch: error" "File not found: $fileFullPath"
         exit 1;
     fi
 
@@ -124,11 +171,18 @@ ScaleAndSetWallpaper()
     #scale and resize the picture for the current resolution
     convert -background black $resizeOpt -extent $screenRes -gravity center -quiet $fileFullPath $wpPath"/apod.png"
 
+    GetDescription
+
     if test "$effectOpt" = ""; then
         #no effect selected, copy the same file
         cp $wpPath"/apod.png" $wpPath"/apod_lock.png"
     else
         convert $effectOpt $wpPath"/apod.png" -quiet $wpPath"/apod_lock.png"
+    fi
+
+    #add description to the lock-screen
+    if test "$lockscreenDesc" = "enabled"; then
+        convert -quiet -pointsize 20 -fill white -undercolor black -draw "text 10,20 '$description' " $wpPath"/apod_lock.png" $wpPath"/apod_lock.png"
     fi
 
     #set the wallpaper
@@ -144,3 +198,5 @@ GetParameters "$1" "$2" "$3"
 DownloadPicture
 
 ScaleAndSetWallpaper
+
+ShowDescriptionAsNotification
