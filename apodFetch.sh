@@ -20,7 +20,7 @@ descAsNotification="enabled"
 messagesAsNotification="enabled"
 
 #show description in lock-screen
-lockscreenDesc="disabled"
+lockscreenDesc="enabled"
 
 ######################################################
 
@@ -162,7 +162,7 @@ DownloadPicture()
 
         description="$(sed -n '/Explanation:/,/Tomorrow/p' $cachePath/cached.html | html2text | sed 's/_/ /g' | sed 's/Explanation: //g' | sed '$d')"
 
-        relativePicPath="$(cat $cachePath/cached.html | grep '^<IMG SRC=.*\.[jpegJPEG]*\"$' | awk -F '"' '{print $2}')"
+        relativePicPath="$(cat $cachePath/cached.html | grep '^<IMG SRC=.*\.[jpegJPEG]*\"' | awk -F '"' '{print $2}')"
 
         if [ ! $relativePicPath ]; then
             ShowMessage "apodFetch: info" "No picture found for the date $targetDate"
