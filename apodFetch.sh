@@ -14,7 +14,7 @@ defaultScaleMode="fill"
 effectOpt="-paint 2 -noise 10"
 
 #show description as notification on wallpaper change
-descAsNotification="enabled"
+descAsNotification="disabled"
 
 #show apodFetch messages as notification
 messagesAsNotification="enabled"
@@ -188,7 +188,7 @@ ScaleAndSetWallpaper()
     fi
 
     #get the current screen resolution
-    screenRes="$(xrandr --current | grep 'primary' | awk -F ' ' '{print $4}' | awk -F '+' '{print $1}')"
+    screenRes="$(xrandr --current | grep '\*' | awk -F ' ' '{print $1}')"
 
     case $scaleMode in
         "center")
