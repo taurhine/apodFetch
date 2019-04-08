@@ -93,21 +93,21 @@ GetParameters()
     case "$1" in
         "")
             #by default the target date will be set to today
-            targetDate=`date +"%y%m%d"`
+            targetDate=`date +"%Y%m%d"`
             ;;
         "-d")
             CheckDependencies
             ;;
         "-r")
             randomDay="$(( ( RANDOM % 365 )  + 1 ))"
-            targetDate=`date --date "-$randomDay day" +"%y%m%d"`
+            targetDate=`date --date "-$randomDay day" +"%Y%m%d"`
             ;;
         "-c")
             #this option accepts numbers >= 0
             if [[ $2 =~ ^[0-9]+$ ]]; then
-                targetDate=`date --date "-$2 day" +"%y%m%d"`
+                targetDate=`date --date "-$2 day" +"%Y%m%d"`
             elif test "$2" = "today"; then
-                targetDate=`date +"%y%m%d"`
+                targetDate=`date +"%Y%m%d"`
             else
                 ShowMessage "apodFetch: error" "invalid parameter for option -c ""$2"
                 exit 1
@@ -156,13 +156,13 @@ DownloadPicture()
     #if the file does not exist try to download it
     if [ ! -f $fileFullPath ]; then
         #fetch the webpage
-        wget $linkPrefix/"ap"$targetDate".html" -q -O $cachePath/cached.html
+        wget $linkPrefix/"ap"${targetDate:2:6}".html" -q -O $cachePath/cached.html
 
         title="$(grep "<title>" $cachePath/cached.html | awk -F ' - ' '{print $2}')"
 
         description="$(sed -n '/Explanation:/,/Tomorrow/p' $cachePath/cached.html | html2text | sed 's/_/ /g' | sed 's/Explanation: //g' | sed '$d')"
 
-        relativePicPath="$(cat $cachePath/cached.html | grep '^<IMG SRC=.*\.[jpegJPEG]*\"' | awk -F '"' '{print $2}')"
+        relativePicPath="$(awk "/${targetDate:0:4}/,/\"/" cached.html | grep "[\w]*g\"" | awk -F '"' '{print $2}')"
 
         if [ ! $relativePicPath ]; then
             ShowMessage "apodFetch: info" "No picture found for the date $targetDate"
