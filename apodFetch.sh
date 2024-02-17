@@ -162,7 +162,7 @@ DownloadPicture()
 
         description="$(sed -n '/Explanation:/,/Tomorrow/p' $cachePath/cached.html | html2text | sed 's/_/ /g' | sed 's/Explanation: //g' | sed '$d')"
 
-        relativePicPath="$(awk "/${targetDate:0:4}/,/\"/" cached.html | grep "[\w]*g\"" | awk -F '"' '{print $2}')"
+        relativePicPath="$(awk "/${targetDate:0:4}/,/\"/" $cachePath/cached.html | grep "[\w]*g\"" | awk -F '"' '{print $2}')"
 
         if [ ! $relativePicPath ]; then
             ShowMessage "apodFetch: info" "No picture found for the date $targetDate"
